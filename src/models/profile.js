@@ -47,6 +47,11 @@ const profileSchema = new mongoose.Schema(
             trim: true,
         },
 
+        resume: {
+            type: String,
+            trim: true,
+        },
+
         profileImage: {
             type: String,
         },

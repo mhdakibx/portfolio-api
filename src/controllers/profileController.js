@@ -16,6 +16,7 @@ export const createProfile = async (req, res) => {
             location,
             github,
             linkedin,
+            resume,
         } = req.body;
 
 
@@ -57,6 +58,7 @@ export const createProfile = async (req, res) => {
             location,
             github,
             linkedin,
+            resume,
             profileImage,
         });
 
@@ -125,6 +127,7 @@ export const updateProfile = async (req, res) => {
             location,
             github,
             linkedin,
+            resume,
         } = req.body;
 
 
@@ -147,6 +150,7 @@ export const updateProfile = async (req, res) => {
         profile.location = location ?? profile.location;
         profile.github = github ?? profile.github;
         profile.linkedin = linkedin ?? profile.linkedin;
+        profile.resume = resume ?? profile.resume;
 
 
         const updatedProfile = await profile.save();
