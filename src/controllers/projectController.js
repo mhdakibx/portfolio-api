@@ -1,9 +1,64 @@
 import Project from "../models/project.js";
 import uploadFile from "../services/storage.services.js";
 
+// Parse technologies into an array
+const parseTechnologies = (value) => {
+    if (Array.isArray(value)) {
+        return value
+            .flat(Infinity)
+            .map((item) => String(item).trim())
+            .filter(Boolean);
+    }
 
+    if (value === undefined || value === null || value === "") {
+        return [];
+    }
+
+    if (typeof value !== "string") {
+        return [];
+    }
+
+    const text = value.trim();
+
+    if (!text) {
+        return [];
+    }
+
+    // Handle JSON array string
+    try {
+        const parsed = JSON.parse(text);
+
+        if (Array.isArray(parsed)) {
+            return parseTechnologies(parsed);
+        }
+
+        if (typeof parsed === "string" && parsed !== text) {
+            return parseTechnologies(parsed);
+        }
+    } catch {
+        // Handle comma-separated values below
+    }
+
+    return text
+        .split(",")
+        .map((item) => item.trim().replace(/^["']|["']$/g, ""))
+        .filter(Boolean);
+};
+
+// Parse boolean values from FormData
+const parseBoolean = (value) => {
+    if (typeof value === "boolean") {
+        return value;
+    }
+
+    return String(value).toLowerCase() === "true";
+};
+
+
+// ========================================
 // Create Project
-
+// POST /api/projects
+// ========================================
 export const createProject = async (req, res) => {
     try {
         const {
@@ -15,7 +70,7 @@ export const createProject = async (req, res) => {
             featured,
         } = req.body;
 
-        if (!title || !description) {
+        if (!title?.trim() || !description?.trim()) {
             return res.status(400).json({
                 message: "Title and description are required",
             });
@@ -23,6 +78,7 @@ export const createProject = async (req, res) => {
 
         let imageUrl = "";
 
+        // Upload image to ImageKit
         if (req.file) {
             const result = await uploadFile(
                 req.file.buffer,
@@ -34,13 +90,13 @@ export const createProject = async (req, res) => {
         }
 
         const project = await Project.create({
-            title,
-            description,
+            title: title.trim(),
+            description: description.trim(),
             image: imageUrl,
-            technologies,
-            githubUrl,
-            liveUrl,
-            featured,
+            technologies: parseTechnologies(technologies),
+            githubUrl: githubUrl || "",
+            liveUrl: liveUrl || "",
+            featured: parseBoolean(featured),
         });
 
         return res.status(201).json({
@@ -49,6 +105,8 @@ export const createProject = async (req, res) => {
         });
 
     } catch (error) {
+        console.error("Create project error:", error);
+
         return res.status(500).json({
             message: "Failed to create project",
             error: error.message,
@@ -57,8 +115,10 @@ export const createProject = async (req, res) => {
 };
 
 
+// ========================================
 // Get All Projects
-
+// GET /api/projects
+// ========================================
 export const getProjects = async (req, res) => {
     try {
         const projects = await Project.find().sort({
@@ -71,6 +131,8 @@ export const getProjects = async (req, res) => {
         });
 
     } catch (error) {
+        console.error("Get projects error:", error);
+
         return res.status(500).json({
             message: "Failed to get projects",
             error: error.message,
@@ -79,8 +141,10 @@ export const getProjects = async (req, res) => {
 };
 
 
+// ========================================
 // Get Single Project
-
+// GET /api/projects/:id
+// ========================================
 export const getProject = async (req, res) => {
     try {
         const project = await Project.findById(req.params.id);
@@ -96,6 +160,8 @@ export const getProject = async (req, res) => {
         });
 
     } catch (error) {
+        console.error("Get project error:", error);
+
         return res.status(500).json({
             message: "Failed to get project",
             error: error.message,
@@ -104,18 +170,12 @@ export const getProject = async (req, res) => {
 };
 
 
+// ========================================
 // Update Project
-
+// PUT /api/projects/:id
+// ========================================
 export const updateProject = async (req, res) => {
     try {
-        const project = await Project.findById(req.params.id);
-
-        if (!project) {
-            return res.status(404).json({
-                message: "Project not found",
-            });
-        }
-
         const {
             title,
             description,
@@ -125,7 +185,15 @@ export const updateProject = async (req, res) => {
             featured,
         } = req.body;
 
+        const project = await Project.findById(req.params.id);
 
+        if (!project) {
+            return res.status(404).json({
+                message: "Project not found",
+            });
+        }
+
+        // Replace image when a new image is uploaded
         if (req.file) {
             const result = await uploadFile(
                 req.file.buffer,
@@ -136,14 +204,30 @@ export const updateProject = async (req, res) => {
             project.image = result.url;
         }
 
+        // Update only provided fields
+        if (title !== undefined) {
+            project.title = title.trim();
+        }
 
-        project.title = title ?? project.title;
-        project.description = description ?? project.description;
-        project.technologies = technologies ?? project.technologies;
-        project.githubUrl = githubUrl ?? project.githubUrl;
-        project.liveUrl = liveUrl ?? project.liveUrl;
-        project.featured = featured ?? project.featured;
+        if (description !== undefined) {
+            project.description = description.trim();
+        }
 
+        if (technologies !== undefined) {
+            project.technologies = parseTechnologies(technologies);
+        }
+
+        if (githubUrl !== undefined) {
+            project.githubUrl = githubUrl;
+        }
+
+        if (liveUrl !== undefined) {
+            project.liveUrl = liveUrl;
+        }
+
+        if (featured !== undefined) {
+            project.featured = parseBoolean(featured);
+        }
 
         const updatedProject = await project.save();
 
@@ -153,6 +237,8 @@ export const updateProject = async (req, res) => {
         });
 
     } catch (error) {
+        console.error("Update project error:", error);
+
         return res.status(500).json({
             message: "Failed to update project",
             error: error.message,
@@ -161,8 +247,10 @@ export const updateProject = async (req, res) => {
 };
 
 
+// ========================================
 // Delete Project
-
+// DELETE /api/projects/:id
+// ========================================
 export const deleteProject = async (req, res) => {
     try {
         const project = await Project.findById(req.params.id);
@@ -180,6 +268,8 @@ export const deleteProject = async (req, res) => {
         });
 
     } catch (error) {
+        console.error("Delete project error:", error);
+
         return res.status(500).json({
             message: "Failed to delete project",
             error: error.message,
